@@ -49,7 +49,7 @@ std::tuple<size_t, R> find_erase_string(int *pins_x, int *pins_y, int pins_count
                                         const int *overflow_image,
                                         int width_height)
 {
-    R best_diff = 0;
+    R best_diff = std::numeric_limits<R>::max();
     size_t best_index = strings_count;
 
     for (size_t i = 0; i < strings_count; i++)
@@ -69,6 +69,14 @@ std::tuple<size_t, R> find_erase_string(int *pins_x, int *pins_y, int pins_count
         auto norm_diff = diff_erase_string<R>(my_image, inverted_image,
                                               overflow_image,
                                               width_height, x1, y1, x2, y2);
+
+        // if (i == 1068)
+        // {
+        //     fmt::print("Erase string {}: ({}, {}), new_diff: {}\n", i, start, end, norm_diff);
+        //     fmt::print("i = {}, start = {}, end = {}, \nx1 = {}, y1 = {}, x2 = {}, y2 = {}\n",
+        //                i, start, end, x1, y1, x2, y2);
+        // }
+
         if (norm_diff < best_diff)
         {
             best_index = i;
@@ -218,7 +226,7 @@ add_all_strings(int *pins_x, int *pins_y, int pins_count, int strings_count,
 
             auto [index, diff] = find_erase_string<R>(
                 pins_x, pins_y, pins_count,
-                strings_start.get(), strings_end.get(), strings_current_count,
+                strings_start.get(), strings_end.get(), strings_count,
                 my_image.get(), inverted_image, overflow_image.get(), width_height);
 
             if (index == strings_current_count)

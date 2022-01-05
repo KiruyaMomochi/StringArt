@@ -26,8 +26,12 @@ __device__ __host__
                    auto draw_value = image_draw<unsigned char>::first();
                    if (old_value != 0)
                        draw_value = image_draw<unsigned char>::first();
-                
+
+#ifdef __CUDA_ARCH__
+                   auto new_value = old_value + ceilf(brightness * draw_value);
+#else
                    auto new_value = old_value + std::ceil(brightness * draw_value);
+#endif
 
                    auto new_value_cast = static_cast<unsigned char>(new_value);
                    if (new_value > image_limits<unsigned char>::max())
@@ -61,13 +65,17 @@ __device__ __host__
                    auto draw_value = image_draw<unsigned char>::first();
                    if (old_value < image_draw<unsigned char>::first())
                        draw_value = image_draw<unsigned char>::first();
-                
+
+#ifdef __CUDA_ARCH__
+                   auto new_value = old_value - ceilf(brightness * draw_value);
+#else                
                    auto new_value = old_value - std::ceil(brightness * draw_value);
+#endif
                    
                    auto new_value_cast = static_cast<unsigned char>(new_value);
                    if (new_value > image_limits<unsigned char>::max())
                        new_value_cast = image_limits<unsigned char>::max();
-                   
+
                    norm_diff += l2_norm_square_diff<R>(inverted_image[index],
                                                       old_value_cast,
                                                       new_value_cast); });

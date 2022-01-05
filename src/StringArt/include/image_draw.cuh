@@ -23,11 +23,11 @@ class image_draw<unsigned char>
 public:
     __device__ __host__ static constexpr unsigned char first() noexcept
     {
-        return 25;
+        return 50;
     }
     __device__ __host__ static constexpr unsigned char next() noexcept
     {
-        return 25;
+        return 50;
     }
 };
 

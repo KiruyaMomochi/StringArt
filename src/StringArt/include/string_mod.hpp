@@ -10,7 +10,6 @@ R add_string(unsigned char *my_image,
              int *overflow_image,
              int width_height, int x1, int y1, int x2, int y2)
 {
-    auto size = width_height * width_height;
     R norm_diff = 0;
     WuDrawLine(x1, y1, x2, y2, [&](int x, int y, float brightness)
                {
@@ -46,7 +45,6 @@ R erase_string(unsigned char *my_image,
                int *overflow_image,
                int width_height, int x1, int y1, int x2, int y2)
 {
-    auto size = width_height * width_height;
     R norm_diff = 0;
     WuDrawLine(x1, y1, x2, y2, [&](int x, int y, float brightness)
                {

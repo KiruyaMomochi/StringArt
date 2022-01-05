@@ -28,6 +28,8 @@ __device__ __host__ void WuDrawLine(float x0, float y0, float x1, float y1,
     { return x - floorf(x); };
     auto rfpart_f = [=](float x) -> float
     { return 1 - fpart_f(x); };
+    auto fabs = [](float x) -> float
+    { return fabsf(x); };
 #else
     auto ipart = [](float x) -> int
     { return int(std::floor(x)); };
@@ -37,9 +39,11 @@ __device__ __host__ void WuDrawLine(float x0, float y0, float x1, float y1,
     { return x - std::floor(x); };
     auto rfpart_f = [=](float x) -> float
     { return 1 - fpart_f(x); };
+    auto fabs = [](float x) -> float
+    { return abs(x); };
 #endif
 
-    const bool steep = abs(y1 - y0) > abs(x1 - x0);
+    const bool steep = fabs(y1 - y0) > fabs(x1 - x0);
     if (steep)
     {
         swap(x0, y0);
