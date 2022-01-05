@@ -1,6 +1,6 @@
 #pragma once
-#ifndef IMAGE_PROCESS_HPP
-#define IMAGE_PROCESS_HPP
+#ifndef IMAGE_PROCESS_CUH
+#define IMAGE_PROCESS_CUH
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include <stb_image_resize.h>
@@ -32,53 +32,17 @@ double pi()
 #include <algorithm>
 #include <stdexcept>
 
-template <typename T>
-class image_limits
-{
-public:
-    static constexpr T min() noexcept
-    {
-        return T();
-    }
-    static constexpr T max() noexcept
-    {
-        return T();
-    }
-};
-
-template <>
-class image_limits<unsigned char>
-{
-public:
-    static constexpr unsigned char min() noexcept
-    {
-        return 0;
-    }
-    static constexpr unsigned char max() noexcept
-    {
-        return 255;
-    }
-};
-
-template <>
-class image_limits<float>
-{
-public:
-    static constexpr float min() noexcept
-    {
-        return 0.0f;
-    }
-    static constexpr float max() noexcept
-    {
-        return 1.0f;
-    }
-};
+#include "image_limits.cuh"
 
 template <typename T>
-std::unique_ptr<T[]> gray_scale(const std::unique_ptr<T[]> &original, int width, int height, int channels, int &gray_channels)
+std::unique_ptr<T[]> gray_scale(const std::unique_ptr<T[]> &original, int width, int height, int channels, int &gray_channels, bool keep_alpha = false)
 {
     // Alpha channel
-    gray_channels = channels == 4 ? 2 : 1;
+    if (keep_alpha)
+        gray_channels = channels == 4 ? 2 : 1;
+    else
+        gray_channels = 1;
+
     auto new_image_size = width * height * gray_channels;
     auto gray = std::make_unique<T[]>(new_image_size);
 
@@ -95,9 +59,9 @@ std::unique_ptr<T[]> gray_scale(const std::unique_ptr<T[]> &original, int width,
 }
 
 template <typename T>
-std::unique_ptr<T[]> resize(const std::unique_ptr<T[]> &original, int width, int height, int channels, int new_width, int new_height);
+std::unique_ptr<T[]> crop(const std::unique_ptr<T[]> &original, int width, int height, int channels, int new_width, int new_height);
 
-std::unique_ptr<unsigned char[]> resize(const std::unique_ptr<unsigned char[]> &original, int width, int height, int channels, int new_width, int new_height)
+std::unique_ptr<unsigned char[]> crop(const std::unique_ptr<unsigned char[]> &original, int width, int height, int channels, int new_width, int new_height)
 {
     auto new_image_size = new_width * new_height * channels;
     auto new_image = std::make_unique<unsigned char[]>(new_image_size);
@@ -107,6 +71,25 @@ std::unique_ptr<unsigned char[]> resize(const std::unique_ptr<unsigned char[]> &
                                              channels, -1, 0,
                                              STBIR_EDGE_CLAMP, STBIR_FILTER_DEFAULT, STBIR_COLORSPACE_LINEAR,
                                              nullptr);
+    if (!result)
+    {
+        throw std::runtime_error("Failed to resize image");
+    }
+
+    return std::move(new_image);
+}
+
+template <typename T>
+std::unique_ptr<T[]> resize(const std::unique_ptr<T[]> &original, int width, int height, int channels, int new_width, int new_height);
+
+std::unique_ptr<unsigned char[]> resize(const std::unique_ptr<unsigned char[]> &original, int width, int height, int channels, int new_width, int new_height)
+{
+    auto new_image_size = new_width * new_height * channels;
+    auto new_image = std::make_unique<unsigned char[]>(new_image_size);
+
+    auto result = stbir_resize_uint8(original.get(), width, height, 0,
+                                     new_image.get(), new_width, new_height, 0,
+                                     channels);
     if (!result)
     {
         throw std::runtime_error("Failed to resize image");
@@ -154,7 +137,6 @@ std::unique_ptr<T[]> stretch_hist(const std::unique_ptr<T[]> &image, int width, 
 template <typename T>
 std::unique_ptr<T[]> stretch_hist(const std::unique_ptr<T[]> &image, int width, int height, int channels, int channel)
 {
-    auto image_size = width * height * channels;
     auto new_image = std::make_unique<unsigned char[]>(width * height);
     auto channel_limit = std::make_unique<std::pair<int, int>[]>(channels);
 

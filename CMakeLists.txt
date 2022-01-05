@@ -20,10 +20,11 @@ include (${CMAKE_BINARY_DIR}/CPM.cmake)
 
 CPMAddPackage("gh:fmtlib/fmt@8.0.1#8.0.1")
 CPMAddPackage("gh:eyalroz/cuda-api-wrappers@0.4.4")
-CPMAddPackage("gh:eyalroz/cuda-api-wrappers@0.4.4")
 
 add_subdirectory(src/stb/)
 add_subdirectory(src/StringArt/)
+add_subdirectory(src/StringArtSequential/)
+add_subdirectory(src/StringArtCuda/)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})

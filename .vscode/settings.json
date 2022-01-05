@@ -91,6 +91,7 @@
         "deque": "cpp",
         "mutex": "cpp",
         "stack": "cpp",
-        "__nullptr": "cpp"
+        "__nullptr": "cpp",
+        "__config": "cpp"
     }
 }
