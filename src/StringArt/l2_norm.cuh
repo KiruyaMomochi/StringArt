@@ -7,7 +7,7 @@
 template <typename R, typename T>
 __device__ __host__ __inline__ R l2_norm_square(const T *x, const T *y, const size_t n)
 {
-    using R_signed = std::make_signed<R>::type;
+    using R_signed = typename std::make_signed<R>::type;
     R sum = 0;
     for (int i = 0; i < n; ++i)
     {
