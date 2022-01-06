@@ -6,7 +6,7 @@
 #include "l2_norm.cuh"
 #include "xiaolin.cuh"
 #include "string_diff.cuh"
-#include "string_mod.hpp"
+#include "string_mod.cuh"
 
 template <typename R>
 std::tuple<int, int, R> find_add_string(const int *pins_x, const int *pins_y, const int pins_count,

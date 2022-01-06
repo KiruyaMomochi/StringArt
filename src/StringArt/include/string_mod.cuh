@@ -1,14 +1,16 @@
 #pragma once
-#ifndef STRING_MOD_HPP
-#define STRING_MOD_HPP
+#ifndef STRING_MOD_CUH
+#define STRING_MOD_CUH
 
 #include "image_draw.cuh"
 
 template <typename R>
-R add_string(unsigned char *my_image,
-             const unsigned char *inverted_image,
-             int *overflow_image,
-             int width_height, int x1, int y1, int x2, int y2)
+__device__ __host__
+    R
+    add_string(unsigned char *my_image,
+               const unsigned char *inverted_image,
+               int *overflow_image,
+               const int width_height, const int x1, const int y1, const int x2, const int y2)
 {
     R norm_diff = 0;
     WuDrawLine(x1, y1, x2, y2, [&](int x, int y, float brightness)
@@ -40,10 +42,12 @@ R add_string(unsigned char *my_image,
 }
 
 template <typename R>
-R erase_string(unsigned char *my_image,
-               const unsigned char *inverted_image,
-               int *overflow_image,
-               int width_height, int x1, int y1, int x2, int y2)
+__device__ __host__
+    R
+    erase_string(unsigned char *my_image,
+                 const unsigned char *inverted_image,
+                 int *overflow_image,
+                 const int width_height, const int x1, const int y1, const int x2, const int y2)
 {
     R norm_diff = 0;
     WuDrawLine(x1, y1, x2, y2, [&](int x, int y, float brightness)
@@ -74,4 +78,4 @@ R erase_string(unsigned char *my_image,
     return norm_diff;
 }
 
-#endif // STRING_MOD_HPP
+#endif // STRING_MOD_CUH

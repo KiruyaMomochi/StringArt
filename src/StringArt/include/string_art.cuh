@@ -7,12 +7,14 @@
 #include "xiaolin.cuh"
 #include "string_diff.cuh"
 #include "string_index.cuh"
-#include "string_mod.hpp"
+#include "string_mod.cuh"
 #include "string_art.hpp"
+
+#include "maxidx/ReduceMaxIdxOptimized.cuh"
 
 template <typename R>
 __global__ void
-add_lines_kernel(
+diff_add_string_kernel(
     const unsigned char *device_my_image, const unsigned char *device_inverted_image, const int width_height,
     const int *device_pins_x, const int *device_pins_y, const int pins_count,
     R *device_diff, const int diff_count)
@@ -21,16 +23,16 @@ add_lines_kernel(
     auto [start, end] = string_index(th, pins_count);
 
     if (th > diff_count || start < 0 || end < 0)
-        {
-            device_diff[th] = std::numeric_limits<R>::max();
-            return;
-        }
+    {
+        device_diff[th] = std::numeric_limits<R>::max();
+        return;
+    }
 
     if (end >= start || start >= pins_count)
-        {
-            device_diff[th] = std::numeric_limits<R>::max();
-            return;
-        }
+    {
+        device_diff[th] = std::numeric_limits<R>::max();
+        return;
+    }
 
     auto x1 = device_pins_x[start];
     auto y1 = device_pins_y[start];
@@ -42,7 +44,7 @@ add_lines_kernel(
 
 template <typename R>
 __global__ void
-erase_lines_kernel(
+diff_erase_string_kernel(
     const unsigned char *device_my_image, const unsigned char *device_inverted_image, const int *device_overflow_image, const int width_height,
     const int *device_strings_start, const int *device_strings_end, const int strings_count,
     const int *device_pins_x, const int *device_pins_y, const int pins_count,
@@ -62,10 +64,10 @@ erase_lines_kernel(
     // // debug code end
 
     if (end >= start || start >= strings_count)
-        {
-            device_diff[th] = std::numeric_limits<R>::max();
-            return;
-        }
+    {
+        device_diff[th] = std::numeric_limits<R>::max();
+        return;
+    }
 
     auto x1 = device_pins_x[start];
     auto y1 = device_pins_y[start];
@@ -89,6 +91,18 @@ erase_lines_kernel(
 }
 
 template <typename R>
+__global__ void add_string_kernel(unsigned char *device_my_image,
+                                  const unsigned char *device_inverted_image,
+                                  int *device_overflow_image,
+                                  const int width_height,
+                                  const int x1, const int y1, const int x2, const int y2,
+                                  R *device_diff)
+{
+    *device_diff = add_string<R>(device_my_image, device_inverted_image, device_overflow_image,
+                                 width_height, x1, y1, x2, y2);
+}
+
+template <typename R>
 std::tuple<int, int, R> find_add_string_cuda(const int *device_pins_x, const int *device_pins_y, const int pins_count,
                                              const unsigned char *device_my_image,
                                              const unsigned char *device_inverted_image,
@@ -109,9 +123,9 @@ std::tuple<int, int, R> find_add_string_cuda(const int *device_pins_x, const int
     auto block_size = 256;
     auto grid_size = (diff_count + block_size - 1) / block_size;
 
-    add_lines_kernel<R><<<grid_size, block_size>>>(device_my_image, device_inverted_image, width_height,
-                                                   device_pins_x, device_pins_y, pins_count,
-                                                   device_diff, diff_count);
+    diff_add_string_kernel<R><<<grid_size, block_size>>>(device_my_image, device_inverted_image, width_height,
+                                                         device_pins_x, device_pins_y, pins_count,
+                                                         device_diff, diff_count);
     auto error = cudaPeekAtLastError();
     if (error != cudaSuccess)
         throw std::runtime_error(cudaGetErrorString(error));
@@ -119,6 +133,8 @@ std::tuple<int, int, R> find_add_string_cuda(const int *device_pins_x, const int
 
     auto diff = std::make_unique<R[]>(diff_count);
     cudaMemcpy(diff.get(), device_diff, diff_count * sizeof(R), cudaMemcpyDeviceToHost);
+
+    
 
     auto best_diff = std::min_element(diff.get(), diff.get() + diff_count);
     auto best_diff_index = static_cast<int>(std::distance(diff.get(), best_diff));
@@ -145,14 +161,19 @@ std::tuple<size_t, R> find_erase_string_cuda(const int *device_pins_x, const int
     auto block_size = 256;
     auto grid_size = (strings_count + block_size - 1) / block_size;
 
-    erase_lines_kernel<R><<<grid_size, block_size>>>(device_my_image, device_inverted_image, device_overflow_image, width_height,
-                                                     device_strings_start, device_strings_end, strings_count,
-                                                     device_pins_x, device_pins_y, pins_count,
-                                                     device_diff);
+    diff_erase_string_kernel<R><<<grid_size, block_size>>>(device_my_image, device_inverted_image, device_overflow_image, width_height,
+                                                           device_strings_start, device_strings_end, strings_count,
+                                                           device_pins_x, device_pins_y, pins_count,
+                                                           device_diff);
     auto error = cudaPeekAtLastError();
     if (error != cudaSuccess)
         throw std::runtime_error(cudaGetErrorString(error));
     cudaDeviceSynchronize();
+
+    R *device_max = nullptr;
+    cudaMalloc(&device_max, sizeof(R));
+
+    
 
     auto diff = std::make_unique<R[]>(strings_count);
     cudaMemcpy(diff.get(), device_diff, strings_count * sizeof(R), cudaMemcpyDeviceToHost);
@@ -345,7 +366,6 @@ add_all_strings_cuda(int *pins_x, int *pins_y, int pins_count, int strings_count
             auto [index, diff] = find_erase_string_cuda<int64_t>(device_pin_x, device_pin_y, pins_count,
                                                                  device_strings_start, device_strings_end, strings_count,
                                                                  device_my_image, device_inverted_image, device_overflow_image, width_height);
-                                                                 
 
             if (index == strings_current_count || diff >= 0)
             {
