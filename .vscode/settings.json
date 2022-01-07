@@ -98,6 +98,8 @@
         "__split_buffer": "cpp",
         "__tree": "cpp",
         "string_view": "cpp",
-        "nvfunctional": "cpp"
+        "nvfunctional": "cpp",
+        "__functional_base": "cpp",
+        "*.tcc": "cpp"
     }
 }

@@ -7,6 +7,7 @@
 #include "xiaolin.cuh"
 #include "string_diff.cuh"
 #include "string_mod.cuh"
+#include "spdlog/spdlog.h"
 
 template <typename R>
 std::tuple<int, int, R> find_add_string(const int *pins_x, const int *pins_y, const int pins_count,
@@ -195,7 +196,7 @@ add_all_strings(int *pins_x, int *pins_y, int pins_count, int strings_count,
                 pins_x, pins_y, pins_count,
                 my_image.get(), inverted_image, width_height);
 
-            if (start == end)
+            if (start == end || diff >= 0)
             {
                 fmt::print("No add string found\n");
                 next_add = false;
@@ -207,7 +208,7 @@ add_all_strings(int *pins_x, int *pins_y, int pins_count, int strings_count,
 
             auto insert_diff = insert_string(start, end);
             current_norm = current_norm + diff;
-            fmt::print("Connect string {}: ({}, {}), new_diff: {} == insert diff: {}\n", strings_current_count, start, end, diff, insert_diff);
+            fmt::print("+ {}: ({}, {}), new_diff: {} == insert diff: {}\n", strings_current_count, start, end, diff, insert_diff);
             assert(diff == insert_diff);
 
             auto current_norm_verify = l2_norm_square<R>(my_image.get(), inverted_image, size);
@@ -229,7 +230,7 @@ add_all_strings(int *pins_x, int *pins_y, int pins_count, int strings_count,
                 strings_start.get(), strings_end.get(), strings_count,
                 my_image.get(), inverted_image, overflow_image.get(), width_height);
 
-            if (index == strings_current_count)
+            if (index == strings_current_count || diff >= 0)
             {
                 fmt::print("No remove string found\n");
                 next_add = true;
@@ -239,9 +240,12 @@ add_all_strings(int *pins_x, int *pins_y, int pins_count, int strings_count,
 
             assert(diff < 0);
 
+            auto string_start_pin = strings_start[index];
+            auto string_end_pin = strings_end[index];
+
             auto remove_diff = remove_string(index);
             current_norm = current_norm + diff;
-            fmt::print("Remove string ({}, {}), new_diff: {} == remove diff: {}\n", strings_start[index], strings_end[index], diff, remove_diff);
+            fmt::print("- {}: ({}, {}), new_diff: {} == remove diff: {}\n", index, string_start_pin, string_end_pin, diff, remove_diff);
             assert(diff == remove_diff);
 
             auto current_norm_verify = l2_norm_square<R>(my_image.get(), inverted_image, size);

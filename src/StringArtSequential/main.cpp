@@ -21,9 +21,10 @@
 
 int main()
 {
-    auto file_name = std::filesystem::path{R"(C:\Users\xtyzw\Projects\StringArt\cat.png)"};
-    // auto pin_count = 64;
-    auto pin_count = 48;
+    auto file_name = std::filesystem::path{R"(/home/kyaru/cs121/StringArt/ada.png)"};
+    auto pin_count = 64;
+    auto pixel_count = 128;
+    auto strings_count = pin_count * pin_count * 2;
 
     int width, height, channels;
 
@@ -41,7 +42,7 @@ int main()
     auto min_width = std::min(width, height);
     auto resize_img = crop(gray_img, width, height, gray_channels, min_width, min_width);
     width = height = min_width;
-    min_width = std::min(width, 512);
+    min_width = std::min(width, pixel_count);
     resize_img = crop(gray_img, width, height, gray_channels, min_width, min_width);
     width = height = min_width;
 
@@ -56,7 +57,7 @@ int main()
     fmt::print("Preprocessing done\n");
 
     auto [pin_start, pin_end, string_img] = add_all_strings<int64_t>(
-        pin_x.get(), pin_y.get(), pin_count, pin_count * pin_count * 10,
+        pin_x.get(), pin_y.get(), pin_count, strings_count,
         inverted_img.get(), width);
     for (int i = 0; i < pin_count; i++)
         fmt::print("Pin {}: ({}, {})\n", i, pin_start[i], pin_end[i]);

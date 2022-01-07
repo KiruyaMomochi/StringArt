@@ -37,6 +37,15 @@ double pi()
 template <typename T>
 std::unique_ptr<T[]> gray_scale(const std::unique_ptr<T[]> &original, int width, int height, int channels, int &gray_channels, bool keep_alpha = false)
 {
+    if (channels == 1)
+    {
+        auto gray = std::make_unique<T[]>(width * height);
+        gray_channels = 1;
+        for (int i = 0; i < width * height; i++)
+            gray[i] = original[i];
+        return std::move(gray);
+    }
+
     // Alpha channel
     if (keep_alpha)
         gray_channels = channels == 4 ? 2 : 1;

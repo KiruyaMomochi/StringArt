@@ -4,4 +4,5 @@ add_executable(StringArtCuda
 target_link_libraries(StringArtCuda
                       StringArt
                       fmt::fmt
-                      stb)
+                      stb
+                      spdlog::spdlog)

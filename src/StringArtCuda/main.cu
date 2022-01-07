@@ -15,7 +15,7 @@
 #include "string_art.cuh"
 #include "string_art.hpp"
 #include "string_diff.cuh"
-#include "string_mod.hpp"
+#include "string_mod.cuh"
 #include "pin.hpp"
 
 #include <functional>
@@ -23,14 +23,23 @@
 #include <utility>
 #include <random>
 
+#include <spdlog/spdlog.h>
+
 int main()
 {
-    auto file_name = std::filesystem::path{R"(C:\Users\xtyzw\Projects\StringArt\cat.png)"};
+    auto file_name = std::filesystem::path{R"(/home/kyaru/cs121/StringArt/ada.png)"};
+    auto pin_count = 64;
+    auto pixel_count = 128;
+    auto strings_count = pin_count * pin_count * 2;
+
     int width, height, channels;
-    auto pin_count = 128;
 
     auto img =
         std::unique_ptr<unsigned char[]>(stbi_load(file_name.string().c_str(), &width, &height, &channels, 0));
+
+    spdlog::info("File {} loaded with {}x{}x{}", file_name.string(), width, height, channels);
+    spdlog::info("{} strings, {} pins, {} pixels", strings_count, pin_count, pixel_count);
+
     if (img.get() == nullptr)
     {
         throw std::runtime_error(fmt::format("Failed to load {}", file_name.string()));
@@ -39,99 +48,60 @@ int main()
     int gray_channels;
     auto gray_img = gray_scale(img, width, height, channels, gray_channels);
     assert(gray_channels == 1);
-
-    auto inverted_name = file_name.replace_filename("inverted.jpg");
-    auto inverted_result = stbi_write_jpg(inverted_name.string().c_str(),
-                                          width, height, 1, gray_img.get(), 100);
+    spdlog::debug("Gray scale image created");
 
     auto min_width = std::min(width, height);
     auto resize_img = crop(gray_img, width, height, gray_channels, min_width, min_width);
     width = height = min_width;
-    min_width = std::min(width, 512);
-    resize_img = crop(gray_img, width, height, gray_channels, min_width, min_width);
+    spdlog::debug("Image cropped");
+
+    min_width = std::min(width, 1024);
+    resize_img = resize(gray_img, width, height, gray_channels, min_width, min_width);
     width = height = min_width;
+    spdlog::debug("Image resized to {}x{}", width, height);
 
     auto stretched_img = stretch_hist(resize_img, width, height, gray_channels, 0);
     assert(gray_channels == 1);
+    spdlog::debug("Image stretched");
 
     auto cropped_img = crop_circle(resize_img, width, height, min_width / 2, gray_channels);
+    spdlog::debug("Image circled");
+
     auto inverted_img = invert(cropped_img, width, height, gray_channels);
+    spdlog::debug("Image inverted");
+
     auto [pin_x, pin_y] = all_pin_cords(width / 2, height / 2, min_width / 2, pin_count);
     plot_pin(cropped_img, width, height, pin_x, pin_y, pin_count);
+    spdlog::debug("Pins plotted");
 
-    fmt::print("Preprocessing done\n");
+    spdlog::info("Preprocessing done");
 
-    auto my_image = std::make_unique<unsigned char[]>(width * height);
-    std::fill_n(my_image.get(), width * height, 0);
-
-    auto overflow_image = std::make_unique<int[]>(width * height);
-    std::fill_n(overflow_image.get(), width * height, 0);
-
-    auto strings_count = pin_count * pin_count * 10;
-
-    auto [pin_start, pin_end, string_img] = add_all_strings_cuda<int64_t>(
+    auto [pin_start, pin_end, string_img] = add_all_strings<int64_t>(
         pin_x.get(), pin_y.get(), pin_count, strings_count,
         inverted_img.get(), width);
+
+    spdlog::info("Strings added");
+
+    auto inverted_name = file_name.replace_filename("inverted.jpg");
+    auto inverted_result = stbi_write_jpg(inverted_name.string().c_str(),
+                                          width, height, 1, inverted_img.get(), 100);
+    spdlog::info("Inverted image saved to {}", inverted_name.string());
 
     auto output_name = file_name.replace_filename("output.jpg");
     auto write_result = stbi_write_jpg(output_name.string().c_str(),
                                        width, height, 1, string_img.get(), 100);
-
-    fmt::print("{} {} {} {}\n", width, height, gray_channels, write_result, gray_channels == 2 ? 1 : -1);
+    spdlog::info("Output image saved to {}", output_name.string());
 
     if (!write_result)
     {
         throw std::runtime_error(fmt::format("Failed to write {}", output_name.string()));
     }
-    
+
     for (int i = 0; i < strings_count; i++)
     {
         if (pin_start[i] != pin_end[i])
-        fmt::print("Pin {}: ({}, {})\n", i, pin_start[i], pin_end[i]);
+            fmt::print("Pin {}: ({}, {})\n", i, pin_start[i], pin_end[i]);
     }
-
-    // while (strings_current_count < strings_count)
-    // {
-
-    //     // auto [start, end, diff] = find_add_string<int64_t>(pin_x.get(), pin_y.get(), pin_count,
-    //     //                                                                   my_image.get(), inverted_img.get(),
-    //     //                                                                   width);
-    //     // fmt::print("{} {} {}\n", host_start, host_end, host_diff);
-    //     cudaDeviceSynchronize();
-    //     fmt::print("+ {} {} {}\n", start, end, diff);
-
-    //     if (diff == 0)
-    //         break;
-
-    //     strings_start[strings_current_count] = start;
-    //     strings_end[strings_current_count] = end;
-    //     strings_current_count++;
-
-    //     add_string<int64_t>(my_image.get(), inverted_img.get(), overflow_image.get(), width,
-    //                         pin_x[start], pin_y[start], pin_x[end], pin_y[end]);
-    // }
-
-    // for (size_t i = 0; i < strings_current_count; i++)
-    // {
-    //     fmt::print("String {} = {} - {}\n", i, strings_start[i], strings_end[i]);
-    // }
-
-    // {
-    //     cudaMemcpy(device_strings_start, strings_start.get(), strings_count * sizeof(int), cudaMemcpyHostToDevice);
-    //     cudaMemcpy(device_strings_end, strings_end.get(), strings_count * sizeof(int), cudaMemcpyHostToDevice);
-    //     cudaMemcpy(device_my_image, my_image.get(), width * height, cudaMemcpyHostToDevice);
-    //     cudaMemcpy(device_overflow_image, overflow_image.get(), width * height, cudaMemcpyHostToDevice);
-
-    //     auto [index, diff] = find_erase_string_cuda<int64_t>(device_pin_x, device_pin_y, pin_count,
-    //                                                          device_strings_start, device_strings_end, strings_count,
-    //                                                          device_my_image, device_inverted_image, device_overflow_image, width);
-    //     auto [host_index, host_diff] = find_erase_string<int64_t>(pin_x.get(), pin_y.get(), pin_count,
-    //                                                               strings_start.get(), strings_end.get(), strings_count,
-    //                                                               my_image.get(), inverted_img.get(), overflow_image.get(), width);
-    //     cudaDeviceSynchronize();
-    //     fmt::print("- {}: {} {} {}\n", index, strings_start[index], strings_end[index], diff);
-    //     fmt::print("= {}: {} {} {}\n", host_index, strings_start[host_index], strings_end[host_index], host_diff);
-    // }
 
     return 0;
 }
