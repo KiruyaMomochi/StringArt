@@ -3,11 +3,13 @@
 #define STRING_ART_HPP
 
 #include <tuple>
+#include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
+
 #include "l2_norm.cuh"
 #include "xiaolin.cuh"
 #include "string_diff.cuh"
 #include "string_mod.cuh"
-#include "spdlog/spdlog.h"
 
 template <typename R>
 std::tuple<int, int, R> find_add_string(const int *pins_x, const int *pins_y, const int pins_count,
@@ -35,7 +37,6 @@ std::tuple<int, int, R> find_add_string(const int *pins_x, const int *pins_y, co
                 best_start = i;
                 best_end = j;
                 best_diff = norm_diff;
-                // fmt::print("Connect string ({}, {}), new_diff: {}\n", i, j, best_diff);
             }
         }
 
@@ -71,13 +72,6 @@ std::tuple<size_t, R> find_erase_string(int *pins_x, int *pins_y, int pins_count
                                               overflow_image,
                                               width_height, x1, y1, x2, y2);
 
-        // if (i == 1068)
-        // {
-        //     fmt::print("Erase string {}: ({}, {}), new_diff: {}\n", i, start, end, norm_diff);
-        //     fmt::print("i = {}, start = {}, end = {}, \nx1 = {}, y1 = {}, x2 = {}, y2 = {}\n",
-        //                i, start, end, x1, y1, x2, y2);
-        // }
-
         if (norm_diff < best_diff)
         {
             best_index = i;
@@ -102,7 +96,7 @@ add_all_strings(int *pins_x, int *pins_y, int pins_count, int strings_count,
     std::fill(overflow_image.get(), overflow_image.get() + size, 0);
 
     auto current_norm = l2_norm_square<R>(my_image.get(), inverted_image, size);
-    fmt::print("l2 norm at start = {}\n", current_norm);
+    spdlog::info("l2 norm at start = {}", current_norm);
 
     auto strings_start = std::make_unique<int[]>(strings_count);
     auto strings_end = std::make_unique<int[]>(strings_count);
@@ -160,23 +154,8 @@ add_all_strings(int *pins_x, int *pins_y, int pins_count, int strings_count,
                              pins_x[start], pins_y[start], pins_x[end], pins_y[end]);
     };
 
-    // auto sum_insert = 0;
-    // auto sum_remove = 0;
-    // for (size_t i = 0; i < pins_count - 1; i++)
-    // {
-    //     auto insert_diff = insert_string(pins_count - 1, i);
-    //     sum_insert += insert_diff;
-    //     fmt::print("Insert diff = {}\n", insert_diff);
-    // }
-    // for (size_t i = 0; i < pins_count - 1; i++)
-    // {
-    //     auto remove_diff = remove_string(i);
-    //     sum_remove += remove_diff;
-    //     fmt::print("Remove diff = {}\n", remove_diff);
-    // }
-    // fmt::print("Sum insert = {}\n", sum_insert);
-    // fmt::print("Sum remove = {}\n", sum_remove);
-    // return std::make_tuple(std::move(strings_start), std::move(strings_end), std::move(my_image));
+    auto iteration_count = 0;
+    auto sw = spdlog::stopwatch{};
 
     while (true)
     {
@@ -198,7 +177,7 @@ add_all_strings(int *pins_x, int *pins_y, int pins_count, int strings_count,
 
             if (start == end || diff >= 0)
             {
-                fmt::print("No add string found\n");
+                spdlog::debug("{}: No add string found", strings_current_count);
                 next_add = false;
                 no_add = true;
                 continue;
@@ -208,12 +187,12 @@ add_all_strings(int *pins_x, int *pins_y, int pins_count, int strings_count,
 
             auto insert_diff = insert_string(start, end);
             current_norm = current_norm + diff;
-            fmt::print("+ {}: ({}, {}), new_diff: {} == insert diff: {}\n", strings_current_count, start, end, diff, insert_diff);
+            spdlog::debug("+ {}: ({}, {}), new_diff: {} == insert diff: {}", strings_current_count, start, end, diff, insert_diff);
             assert(diff == insert_diff);
 
-            auto current_norm_verify = l2_norm_square<R>(my_image.get(), inverted_image, size);
-            fmt::print("l2 norm after add = {} == verify = {}\n", current_norm, current_norm_verify);
-            
+            // auto current_norm_verify = l2_norm_square<R>(my_image.get(), inverted_image, size);
+            // spdlog::debug("l2 norm after add = {} == verify = {}", current_norm, current_norm_verify);
+
             no_remove = false;
         }
         else
@@ -232,7 +211,7 @@ add_all_strings(int *pins_x, int *pins_y, int pins_count, int strings_count,
 
             if (index == strings_current_count || diff >= 0)
             {
-                fmt::print("No remove string found\n");
+                spdlog::debug("{}: No remove string found", strings_current_count);
                 next_add = true;
                 no_remove = true;
                 continue;
@@ -245,15 +224,20 @@ add_all_strings(int *pins_x, int *pins_y, int pins_count, int strings_count,
 
             auto remove_diff = remove_string(index);
             current_norm = current_norm + diff;
-            fmt::print("- {}: ({}, {}), new_diff: {} == remove diff: {}\n", index, string_start_pin, string_end_pin, diff, remove_diff);
+            spdlog::debug("- {}: ({}, {}), new_diff: {} == remove diff: {}", index, string_start_pin, string_end_pin, diff, remove_diff);
             assert(diff == remove_diff);
 
-            auto current_norm_verify = l2_norm_square<R>(my_image.get(), inverted_image, size);
-            fmt::print("l2 norm after remove = {} == verify = {}\n", current_norm, current_norm_verify);
-            
+            // auto current_norm_verify = l2_norm_square<R>(my_image.get(), inverted_image, size);
+            // spdlog::debug("l2 norm after remove = {} == verify = {}", current_norm, current_norm_verify);
+
             no_add = false;
         }
+
+        iteration_count++;
     }
+
+    spdlog::info("l2 norm after iteration = {}", current_norm);
+    spdlog::info("{}s, {} iterations", sw, iteration_count);
 
     return std::make_tuple(std::move(strings_start), std::move(strings_end), std::move(my_image));
 }

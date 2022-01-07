@@ -7,5 +7,6 @@ foreach(file ${STB_FILES})
 endforeach()
 
 add_library(stb INTERFACE)
+add_library(StringArt::stb ALIAS stb)
 target_include_directories(stb INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/include/")
 set_target_properties(stb PROPERTIES LINKER_LANGUAGE CXX)

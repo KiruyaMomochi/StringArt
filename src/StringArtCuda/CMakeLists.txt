@@ -2,7 +2,8 @@ add_executable(StringArtCuda
                main.cu)
 
 target_link_libraries(StringArtCuda
-                      StringArt
+                      StringArt::StringArt
                       fmt::fmt
-                      stb
-                      spdlog::spdlog)
+                      StringArt::stb
+                      spdlog::spdlog
+                      cxxopts::cxxopts)

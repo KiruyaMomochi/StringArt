@@ -21,6 +21,7 @@ include (${CMAKE_BINARY_DIR}/CPM.cmake)
 CPMAddPackage("gh:fmtlib/fmt@8.0.1#8.0.1")
 CPMAddPackage("gh:eyalroz/cuda-api-wrappers@0.4.4")
 CPMAddPackage("gh:gabime/spdlog@1.9.2")
+CPMAddPackage("gh:jarro2783/cxxopts@3.0.0")
 
 add_subdirectory(src/stb/)
 add_subdirectory(src/StringArt/)

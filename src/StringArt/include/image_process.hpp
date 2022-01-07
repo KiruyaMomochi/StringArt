@@ -17,7 +17,7 @@ double pi()
 {
 #if __cplusplus > 202002L
     return std::numbers::pi;
-#elif __cplusplus > 201103L
+#elif __cplusplus > 201103L && !defined(__clang__)
     return std::atan(1.0) * 4.0;
 #elif defined(M_PI)
     return M_PI;

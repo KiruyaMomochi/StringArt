@@ -3,6 +3,9 @@
 #define STRING_ART_CUH
 
 #include <tuple>
+#include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
+
 #include "l2_norm.cuh"
 #include "xiaolin.cuh"
 #include "string_diff.cuh"
@@ -74,18 +77,6 @@ diff_erase_string_kernel(
     auto x2 = device_pins_x[end];
     auto y2 = device_pins_y[end];
 
-    // // debug code start
-    // if (th != 1068)
-    //     return;
-    // device_diff[0] = th;
-    // device_diff[1] = start;
-    // device_diff[2] = end;
-    // device_diff[3] = x1;
-    // device_diff[4] = y1;
-    // device_diff[5] = x2;
-    // device_diff[6] = y2;
-    // // debug code end
-
     device_diff[th] = diff_erase_string<R>(device_my_image, device_inverted_image, device_overflow_image,
                                            width_height, x1, y1, x2, y2);
 }
@@ -109,12 +100,6 @@ std::tuple<int, int, R> find_add_string_cuda(const int *device_pins_x, const int
                                              const int width_height)
 {
     auto diff_count = count_strings(pins_count);
-
-    // for (size_t i = 0; i < diff_count; i++)
-    // {
-    //     auto [x, y] = string_index(i, pins_count);
-    //     fmt::print("{} => ({}, {})\n", i, x, y);
-    // }
 
     R *device_diff = nullptr;
     cudaMalloc(&device_diff, diff_count * sizeof(R));
@@ -156,6 +141,8 @@ std::tuple<size_t, R> find_erase_string_cuda(const int *device_pins_x, const int
 {
     R *device_diff = nullptr;
     cudaMalloc(&device_diff, strings_count * sizeof(R));
+    if (device_diff == nullptr)
+        throw std::runtime_error("cudaMalloc failed");
     cudaMemset(device_diff, 0, strings_count * sizeof(R));
 
     auto block_size = 256;
@@ -170,23 +157,17 @@ std::tuple<size_t, R> find_erase_string_cuda(const int *device_pins_x, const int
         throw std::runtime_error(cudaGetErrorString(error));
     cudaDeviceSynchronize();
 
-    R *device_max = nullptr;
-    cudaMalloc(&device_max, sizeof(R));
-
-    
+    // R *device_max = nullptr;
+    // cudaMalloc(&device_max, sizeof(R));
 
     auto diff = std::make_unique<R[]>(strings_count);
     cudaMemcpy(diff.get(), device_diff, strings_count * sizeof(R), cudaMemcpyDeviceToHost);
-
-    // for (size_t i = 0; i < strings_count; i++)
-    // {
-    //     fmt::print("Cuda Erase string {}, new_diff: {}\n", i, diff[i]);
-    // }
 
     auto best_diff = std::min_element(diff.get(), diff.get() + strings_count);
     auto best_diff_index = static_cast<int>(std::distance(diff.get(), best_diff));
 
     cudaFree(device_diff);
+    // cidaFree(device_max);
 
     return std::make_tuple(best_diff_index, *best_diff);
 }
@@ -217,7 +198,7 @@ add_all_strings_cuda(int *pins_x, int *pins_y, int pins_count, int strings_count
     cudaMemcpy(device_pin_y, pins_y, pins_count * sizeof(int), cudaMemcpyHostToDevice);
 
     auto current_norm = l2_norm_square<R>(my_image.get(), inverted_image, size);
-    fmt::print("l2 norm at start = {}\n", current_norm);
+    spdlog::info("l2 norm at start = {}", current_norm);
 
     auto strings_start = std::make_unique<int[]>(strings_count);
     std::fill_n(strings_start.get(), strings_count, -1);
@@ -288,23 +269,8 @@ add_all_strings_cuda(int *pins_x, int *pins_y, int pins_count, int strings_count
                              pins_x[start], pins_y[start], pins_x[end], pins_y[end]);
     };
 
-    // auto sum_insert = 0;
-    // auto sum_remove = 0;
-    // for (size_t i = 0; i < pins_count - 1; i++)
-    // {
-    //     auto insert_diff = insert_string(pins_count - 1, i);
-    //     sum_insert += insert_diff;
-    //     fmt::print("Insert diff = {}\n", insert_diff);
-    // }
-    // for (size_t i = 0; i < pins_count - 1; i++)
-    // {
-    //     auto remove_diff = remove_string(i);
-    //     sum_remove += remove_diff;
-    //     fmt::print("Remove diff = {}\n", remove_diff);
-    // }
-    // fmt::print("Sum insert = {}\n", sum_insert);
-    // fmt::print("Sum remove = {}\n", sum_remove);
-    // return std::make_tuple(std::move(strings_start), std::move(strings_end), std::move(my_image));
+    auto iteration_count = 0;
+    auto sw = spdlog::stopwatch{};
 
     while (true)
     {
@@ -326,7 +292,7 @@ add_all_strings_cuda(int *pins_x, int *pins_y, int pins_count, int strings_count
 
             if (start == end || diff >= 0)
             {
-                fmt::print("{}: No add string found\n", strings_current_count);
+                spdlog::debug("{}: No add string found", strings_current_count);
                 next_add = false;
                 no_add = true;
                 continue;
@@ -336,15 +302,15 @@ add_all_strings_cuda(int *pins_x, int *pins_y, int pins_count, int strings_count
 
             // auto [host_start, host_end, host_diff] = find_add_string<int64_t>(pins_x, pins_y, pins_count,
             //                                                                   my_image.get(), inverted_image, width_height);
-            // fmt::print("= {} {} {}\n", host_start, host_end, host_diff);
+            // fmt::print("= {} {} {}", host_start, host_end, host_diff);
 
             auto insert_diff = insert_string(start, end);
             current_norm = current_norm + diff;
-            fmt::print("+ {}: ({}, {}), new_diff: {} == insert diff: {}\n", strings_current_count, start, end, diff, insert_diff);
+            spdlog::debug("+ {}: ({}, {}), new_diff: {} == insert diff: {}", strings_current_count, start, end, diff, insert_diff);
             assert(diff == insert_diff);
 
             // auto current_norm_verify = l2_norm_square<R>(my_image.get(), inverted_image, size);
-            // fmt::print("l2 norm after add = {} == verify = {}\n", current_norm, current_norm_verify);
+            // fmt::print("l2 norm after add = {} == verify = {}", current_norm, current_norm_verify);
             // assert(current_norm == current_norm_verify);
 
             no_remove = false;
@@ -369,7 +335,7 @@ add_all_strings_cuda(int *pins_x, int *pins_y, int pins_count, int strings_count
 
             if (index == strings_current_count || diff >= 0)
             {
-                fmt::print("{}: No remove string found\n", strings_current_count);
+                spdlog::debug("{}: No remove string found", strings_current_count);
                 next_add = true;
                 no_remove = true;
                 continue;
@@ -380,23 +346,36 @@ add_all_strings_cuda(int *pins_x, int *pins_y, int pins_count, int strings_count
             // auto [host_index, host_diff] = find_erase_string<int64_t>(pins_x, pins_y, pins_count,
             //                                                       strings_start.get(), strings_end.get(), strings_count,
             //                                                       my_image.get(), inverted_image, overflow_image.get(), width_height);
-            // fmt::print("= {}: {} {} {}\n", host_index, strings_start[host_index], strings_end[host_index], host_diff);
+            // fmt::print("= {}: {} {} {}", host_index, strings_start[host_index], strings_end[host_index], host_diff);
 
             auto string_start_pin = strings_start[index];
             auto string_end_pin = strings_end[index];
 
             auto remove_diff = remove_string(index);
             current_norm = current_norm + diff;
-            fmt::print("- {}: ({}, {}), new_diff: {} == remove diff: {}\n", index, string_start_pin, string_end_pin, diff, remove_diff);
+            spdlog::debug("- {}: ({}, {}), new_diff: {} == remove diff: {}", index, string_start_pin, string_end_pin, diff, remove_diff);
             assert(diff == remove_diff);
 
             // auto current_norm_verify = l2_norm_square<R>(my_image.get(), inverted_image, size);
-            // fmt::print("l2 norm after remove = {} == verify = {}\n", current_norm, current_norm_verify);
+            // fmt::print("l2 norm after remove = {} == verify = {}", current_norm, current_norm_verify);
             // assert(current_norm == current_norm_verify);
 
             no_add = false;
         }
+
+        iteration_count++;
     }
+
+    spdlog::info("l2 norm after iteration = {}", current_norm);
+    spdlog::info("{}s, {} iterations", sw, iteration_count);
+
+    cudaFree(device_pin_x);
+    cudaFree(device_pin_y);
+    cudaFree(device_strings_start);
+    cudaFree(device_strings_end);
+    cudaFree(device_my_image);
+    cudaFree(device_inverted_image);
+    cudaFree(device_overflow_image);
 
     return std::make_tuple(std::move(strings_start), std::move(strings_end), std::move(my_image));
 }

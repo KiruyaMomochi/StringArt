@@ -16,18 +16,18 @@ public:
     }
 };
 
-
+// TODO: currently only supports first()
 template <>
 class image_draw<unsigned char>
 {
 public:
     __device__ __host__ static constexpr unsigned char first() noexcept
     {
-        return 50;
+        return 40;
     }
     __device__ __host__ static constexpr unsigned char next() noexcept
     {
-        return 50;
+        return 40;
     }
 };
 
