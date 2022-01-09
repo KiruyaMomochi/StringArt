@@ -1,0 +1,8 @@
+#pragma once
+#ifndef L2_NORM_HPP
+#define L2_NORM_HPP
+
+template <typename T>
+T l2_norm_square(const T* x, const T* y, const int n);
+
+#endif // L2_NORM_HPP
